@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DisasterLens - Disaster Impact Prediction and Resource Allocation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .impact-minimal { background-color: #d1e7dd; }
+        .impact-minor { background-color: #fff3cd; }
+        .impact-moderate { background-color: #ffe5d0; }
+        .impact-severe { background-color: #f8d7da; }
+        .impact-catastrophic { background-color: #dc3545; color: white; }
+        .spinner-border {
+            display: none;
+            margin-left: 10px;
+        }
+        .debug-info {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            border-radius: 0.25rem;
+            display: none;
+        }
+        .card-body {
+            position: relative;
+        }
+        .reset-btn {
+            margin-left: 10px;
+        }
+        /* Autocomplete styles */
+        .location-autocomplete-container {
+            position: relative;
+        }
+        #location-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ced4da;
+            border-radius: 0 0 0.25rem 0.25rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .suggestion-item:hover, .suggestion-item:focus {
+            background-color: #f8f9fa;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        /* Progress bar styling */
+        .progress {
+            margin-top: 5px;
+            height: 10px;
+        }
+        /* Responsive design improvements */
+        @media (max-width: 768px) {
+            #map {
+                height: 300px;
+            }
+            .card {
+                margin-bottom: 15px;
+            }
+            .btn {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.9rem;
+            }
+            .reset-btn {
+                margin-left: 5px;
+            }
+            .spinner-border {
+                width: 1rem;
+                height: 1rem;
+            }
+            .table {
+                font-size: 0.9rem;
+            }
+        }
+        @media (max-width: 576px) {
+            .d-flex {
+                flex-wrap: wrap;
+            }
+            .btn {
+                margin-bottom: 5px;
+                width: 100%;
+            }
+            .reset-btn {
+                margin-left: 0;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">DisasterLens</a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">DisasterLens <small class="text-muted">Disaster Impact Prediction</small></h1>
+        
+        <!-- Error container -->
+        <div id="error-container" class="alert alert-danger mb-4" style="display: none;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span id="error-message"></span>
+            </div>
+            <button type="button" class="btn-close float-end" aria-label="Close" onclick="document.getElementById('error-container').style.display = 'none';"></button>
+        </div>
+        
+        <!-- Loading spinner -->
+        <div id="loading-spinner" class="text-center my-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Processing your request...</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <h1>Disaster Impact Prediction and Resource Allocation</h1>
+                <p class="lead">
+                    Predict the impact of natural disasters and optimize resource allocation using real-time data.
+                </p>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Disaster Impact Prediction</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="prediction-form">
+                            <div class="mb-3 location-autocomplete-container">
+                                <label for="location" class="form-label">Location</label>
+                                <input type="text" class="form-control" id="location" placeholder="Type to search for a location...">
+                                <div id="location-suggestions"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="disaster-type" class="form-label">Disaster Type</label>
+                                <select class="form-select" id="disaster-type">
+                                    <!-- Will be populated from API -->
+                                </select>
+                            </div>
+                            <div class="d-flex">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search"></i> Predict Impact
+                                    <span class="spinner-border spinner-border-sm" id="prediction-spinner" role="status" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary reset-btn" id="prediction-reset">
+                                    <i class="bi bi-x-circle"></i> Reset
+                                </button>
+                                <button type="button" class="btn btn-outline-info reset-btn" id="prediction-refresh" style="display: none;">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </form>
+                        <div class="loading-overlay" id="prediction-loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4" id="prediction-results" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Disaster Impact Prediction Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Impact Assessment</h6>
+                                <div class="d-flex align-items-center mb-3">
+                                    <div id="impact-indicator" class="me-3" style="width: 20px; height: 20px; border-radius: 50%;"></div>
+                                    <div>
+                                        <h3 id="impact-level" class="mb-0"></h3>
+                                        <p class="text-muted mb-0">Impact Level</p>
+                                    </div>
+                                </div>
+                                <div class="progress mb-3" style="height: 25px;">
+                                    <div id="impact-progress" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                </div>
+                                <p><strong>Location:</strong> <span id="result-location"></span></p>
+                                <p><strong>Disaster Type:</strong> <span id="result-disaster-type"></span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Weather Conditions</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <tbody id="weather-data">
+                                            <!-- Weather data will be inserted here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <h6 class="mt-3">Social Signals</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <tbody id="social-data">
+                                            <!-- Social data will be inserted here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="accordion" id="disasterSpecificData">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingDisasterSpecific">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDisasterSpecific" aria-expanded="false" aria-controls="collapseDisasterSpecific">
+                                                <span id="disaster-specific-title">Disaster-Specific Factors</span>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseDisasterSpecific" class="accordion-collapse collapse" aria-labelledby="headingDisasterSpecific" data-bs-parent="#disasterSpecificData">
+                                            <div class="accordion-body">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <tbody id="disaster-specific-data">
+                                                            <!-- Disaster-specific data will be inserted here -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="accordion" id="debugInfo" style="display: none;">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingDebug">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDebug" aria-expanded="false" aria-controls="collapseDebug">
+                                                Debug Information
+                                            </button>
+                                        </h2>
+                                        <div id="collapseDebug" class="accordion-collapse collapse" aria-labelledby="headingDebug" data-bs-parent="#debugInfo">
+                                            <div class="accordion-body">
+                                                <pre id="debug-info" class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Resource Allocation</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="allocation-form">
+                            <div class="mb-3">
+                                <label for="regions" class="form-label">Regions (comma-separated)</label>
+                                <input type="text" class="form-control" id="regions" placeholder="e.g., Kathmandu,Pokhara">
+                            </div>
+                            <div id="resources-container">
+                                <label class="form-label">Resources</label>
+                                <div class="mb-3 resource-input">
+                                    <div class="input-group">
+                                        <select class="form-select resource-type" style="max-width: 150px;">
+                                            <!-- Will be populated from API -->
+                                        </select>
+                                        <input type="number" class="form-control resource-amount" placeholder="Amount" min="1" value="1000">
+                                        <button type="button" class="btn btn-outline-secondary remove-resource">-</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary mb-3" id="add-resource">Add Resource</button>
+                            <div class="d-flex">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-distribute-vertical"></i> Allocate Resources
+                                    <span class="spinner-border spinner-border-sm" id="allocation-spinner" role="status" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary reset-btn" id="allocation-reset">
+                                    <i class="bi bi-x-circle"></i> Reset
+                                </button>
+                            </div>
+                        </form>
+                        <div class="loading-overlay" id="allocation-loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3" id="allocation-results" style="display: none;">
+                    <div class="card-header">
+                        <h5>Allocation Results</h5>
+                    </div>
+                    <div class="card-body" id="allocation-results-content">
+                        <!-- Results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Markers for predictions and allocations
+        const markers = {};
+        const markerLayer = L.layerGroup().addTo(map);
+        
+        // Simple client-side cache for API responses
+        const apiCache = {
+            predictions: {},
+            geocoding: {},
+            
+            // Cache a prediction result
+            cachePrediction: function(location, disasterType, data) {
+                const key = `${location}:${disasterType}`;
+                this.predictions[key] = {
+                    data: data,
+                    timestamp: Date.now()
+                };
+                console.log(`Cached prediction for ${key}`);
+            },
+            
+            // Get a cached prediction if it exists and is not expired
+            getCachedPrediction: function(location, disasterType, maxAgeMs = 5 * 60 * 1000) { // 5 minutes default
+                const key = `${location}:${disasterType}`;
+                const cached = this.predictions[key];
+                
+                if (cached && (Date.now() - cached.timestamp) < maxAgeMs) {
+                    console.log(`Using cached prediction for ${key}`);
+                    return cached.data;
+                }
+                
+                return null;
+            },
+            
+            // Cache geocoding result
+            cacheGeocoding: function(location, coords) {
+                this.geocoding[location] = {
+                    coords: coords,
+                    timestamp: Date.now()
+                };
+                console.log(`Cached geocoding for ${location}`);
+            },
+            
+            // Get cached geocoding if it exists
+            getCachedGeocoding: function(location) {
+                const cached = this.geocoding[location];
+                
+                if (cached) {
+                    console.log(`Using cached geocoding for ${location}`);
+                    return cached.coords;
+                }
+                
+                return null;
+            }
+        };
+        
+        // Location autocomplete variables
+        let debounceTimer;
+        let selectedLocationData = null;
+
+        // Setup location autocomplete
+        const locationInput = document.getElementById('location');
+        const suggestionsContainer = document.getElementById('location-suggestions');
+        
+        // Add event listener for input changes with debounce
+        locationInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const query = this.value.trim();
+                if (query.length < 2) {
+                    suggestionsContainer.style.display = 'none';
+                    return;
+                }
+                
+                fetchLocationSuggestions(query);
+            }, 300); // 300ms debounce
+        });
+        
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.location-autocomplete-container')) {
+                suggestionsContainer.style.display = 'none';
+            }
+        });
+        
+        // Fetch location suggestions from Nominatim
+        async function fetchLocationSuggestions(query) {
+            try {
+                console.log(`Fetching suggestions for: ${query}`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`);
+                const data = await response.json();
+                
+                suggestionsContainer.innerHTML = '';
+                
+                if (data && data.length > 0) {
+                    data.forEach(place => {
+                        const item = document.createElement('div');
+                        item.className = 'suggestion-item';
+                        item.textContent = place.display_name;
+                        item.setAttribute('data-lat', place.lat);
+                        item.setAttribute('data-lon', place.lon);
+                        
+                        item.addEventListener('click', function() {
+                            locationInput.value = place.display_name;
+                            selectedLocationData = {
+                                name: place.display_name,
+                                lat: parseFloat(place.lat),
+                                lon: parseFloat(place.lon)
+                            };
+                            suggestionsContainer.style.display = 'none';
+                            console.log('Selected location:', selectedLocationData);
+                        });
+                        
+                        suggestionsContainer.appendChild(item);
+                    });
+                    
+                    suggestionsContainer.style.display = 'block';
+                } else {
+                    suggestionsContainer.innerHTML = '<div class="suggestion-item">No results found</div>';
+                    suggestionsContainer.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching location suggestions:', error);
+                suggestionsContainer.style.display = 'none';
+            }
+        }
+
+        // Fetch disaster types
+        fetch('/api/disaster_types')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('disaster-type');
+                data.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.id;
+                    option.textContent = type.name;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching disaster types:', error);
+            });
+
+        // Fetch resource types
+        fetch('/api/resource_types')
+            .then(response => response.json())
+            .then(data => {
+                window.resourceTypes = data;
+                populateResourceTypes();
+            })
+            .catch(error => {
+                console.error('Error fetching resource types:', error);
+            });
+
+        // Populate resource types in select
+        function populateResourceTypes(selectElement) {
+            if (!window.resourceTypes) return;
+            
+            const selects = selectElement ? [selectElement] : document.querySelectorAll('.resource-type');
+            
+            selects.forEach(select => {
+                // Clear existing options
+                select.innerHTML = '';
+                
+                // Add options
+                window.resourceTypes.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.id;
+                    option.textContent = type.name;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        // Add resource input
+        document.getElementById('add-resource').addEventListener('click', function() {
+            const container = document.getElementById('resources-container');
+            const div = document.createElement('div');
+            div.className = 'mb-3 resource-input';
+            div.innerHTML = `
+                <div class="input-group">
+                    <select class="form-select resource-type" style="max-width: 150px;"></select>
+                    <input type="number" class="form-control resource-amount" placeholder="Amount" min="1" value="500">
+                    <button type="button" class="btn btn-outline-secondary remove-resource">-</button>
+                </div>
+            `;
+            container.appendChild(div);
+            
+            // Populate the new select
+            populateResourceTypes(div.querySelector('.resource-type'));
+            
+            // Add event listener to remove button
+            div.querySelector('.remove-resource').addEventListener('click', function() {
+                div.remove();
+            });
+        });
+
+        // Remove resource input
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-resource')) {
+                e.target.closest('.resource-input').remove();
+            }
+        });
+
+        // Geocode a location
+        async function geocodeLocation(location) {
+            console.log(`Geocoding location: ${location}`);
+            
+            // Check cache first
+            const cachedCoords = apiCache.getCachedGeocoding(location);
+            if (cachedCoords) {
+                return cachedCoords;
+            }
+            
+            // Check if it's already coordinates
+            if (location.includes(',')) {
+                const parts = location.split(',').map(part => part.trim());
+                if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
+                    console.log(`Parsed coordinates: ${parts[0]}, ${parts[1]}`);
+                    const coords = {
+                        lat: parseFloat(parts[0]),
+                        lon: parseFloat(parts[1])
+                    };
+                    apiCache.cacheGeocoding(location, coords);
+                    return coords;
+                }
+            }
+            
+            // Fallback coordinates for common locations
+            const fallbackCoordinates = {
+                'kathmandu': { lat: 27.7172, lon: 85.3240 },
+                'pokhara': { lat: 28.2096, lon: 83.9856 },
+                'boston': { lat: 42.3601, lon: -71.0589 },
+                'meghalaya': { lat: 25.4670, lon: 91.3662 },
+                'new delhi': { lat: 28.6139, lon: 77.2090 },
+                'mumbai': { lat: 19.0760, lon: 72.8777 },
+                'oregon': { lat: 44.0, lon: -120.5 },
+                'tokyo': { lat: 35.6762, lon: 139.6503 },
+                'london': { lat: 51.5074, lon: -0.1278 },
+                'mount fuji': { lat: 35.3606, lon: 138.7274 },
+                'fuji': { lat: 35.3606, lon: 138.7274 }
+            };
+            
+            // Check if location matches any of our fallback locations
+            const locationLower = location.toLowerCase();
+            for (const [key, coords] of Object.entries(fallbackCoordinates)) {
+                if (locationLower.includes(key)) {
+                    console.log(`Using fallback coordinates for ${key}`);
+                    apiCache.cacheGeocoding(location, coords);
+                    return coords;
+                }
+            }
+            
+            // Otherwise use Nominatim for geocoding
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json`);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    console.log(`Geocoded ${location} to: ${data[0].lat}, ${data[0].lon}`);
+                    const coords = {
+                        lat: parseFloat(data[0].lat),
+                        lon: parseFloat(data[0].lon)
+                    };
+                    apiCache.cacheGeocoding(location, coords);
+                    return coords;
+                }
+                
+                console.log(`Could not geocode location: ${location}`);
+                return null;
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                return null;
+            }
+        }
+
+        // Add marker to map
+        function addMarker(location, lat, lng, impactLevel, impactScore) {
+            console.log(`Adding marker for ${location} at ${lat}, ${lng} with impact ${impactLevel} (${impactScore})`);
+            
+            // Remove existing marker
+            if (markers[location]) {
+                markerLayer.removeLayer(markers[location]);
+                delete markers[location];
+            }
+            
+            // Determine color based on impact level
+            let color;
+            switch (impactLevel) {
+                case 'minimal': color = 'green'; break;
+                case 'minor': color = 'yellow'; break;
+                case 'moderate': color = 'orange'; break;
+                case 'severe': color = 'red'; break;
+                case 'catastrophic': color = 'darkred'; break;
+                default: color = 'blue';
+            }
+            
+            // Create marker
+            const marker = L.circleMarker([lat, lng], {
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.5,
+                radius: 10 + (impactScore * 20)
+            }).addTo(markerLayer);
+            
+            // Add enhanced popup with more detailed information
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <h5 style="margin: 0 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 5px;">${location}</h5>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <strong>Impact Level:</strong>
+                        <span style="color: ${color}; font-weight: bold;">${impactLevel.charAt(0).toUpperCase() + impactLevel.slice(1)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <strong>Risk Score:</strong>
+                        <span>${(impactScore * 100).toFixed(1)}%</span>
+                    </div>
+                    <div style="font-size: 0.8em; margin-top: 8px; color: #666;">
+                        Click on the prediction or allocation buttons to see more details.
+                    </div>
+                </div>
+            `);
+            
+            // Store marker
+            markers[location] = marker;
+            
+            return marker;
+        }
+
+        // Prediction form submission
+        document.getElementById('prediction-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Clear previous results and errors
+            document.getElementById('error-message').textContent = '';
+            document.getElementById('error-container').style.display = 'none';
+            
+            // Show loading spinner
+            document.getElementById('loading-spinner').style.display = 'block';
+            
+            const location = document.getElementById('location').value;
+            const disasterType = document.getElementById('disaster-type').value;
+            
+            // Validate inputs
+            if (!location || !disasterType) {
+                document.getElementById('error-message').textContent = 'Please fill in all required fields.';
+                document.getElementById('error-container').style.display = 'block';
+                document.getElementById('loading-spinner').style.display = 'none';
+                return;
+            }
+            
+            try {
+                console.log(`Predicting for ${location}, ${disasterType}`);
+                
+                // Check for cached prediction
+                const cachedPrediction = apiCache.getCachedPrediction(location, disasterType);
+                let data;
+                
+                if (cachedPrediction) {
+                    console.log("Using cached prediction for", location, disasterType);
+                    data = cachedPrediction;
+                } else {
+                    // Get coordinates for the location
+                    const coordinates = await geocodeLocation(location);
+                    if (!coordinates) {
+                        throw new Error('Could not geocode the location. Please try a different location or format.');
+                    }
+                    
+                    // Make API request - use the legacy endpoint for compatibility
+                    console.log(`Making request to /predict/${encodeURIComponent(location)}/${encodeURIComponent(disasterType)}`);
+                    const response = await fetch(`/predict/${encodeURIComponent(location)}/${encodeURIComponent(disasterType)}`, {
+                        method: 'GET'
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to get prediction. Please try again.');
+                    }
+                    
+                    data = await response.json();
+                    console.log("Received prediction data:", data);
+                    
+                    // Add coordinates to the data
+                    data.coordinates = coordinates;
+                    
+                    // Cache the prediction
+                    apiCache.cachePrediction(location, disasterType, data);
+                }
+                
+                // Display results
+                displayPredictionResults(data);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error-message').textContent = error.message || 'An unexpected error occurred. Please try again.';
+                document.getElementById('error-container').style.display = 'block';
+            } finally {
+                // Hide loading spinner
+                document.getElementById('loading-spinner').style.display = 'none';
+            }
+        });
+
+        // Allocation form submission
+        document.getElementById('allocation-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Clear previous results and errors
+            document.getElementById('error-message').textContent = '';
+            document.getElementById('error-container').style.display = 'none';
+            
+            // Show loading spinner
+            document.getElementById('loading-spinner').style.display = 'block';
+            
+            try {
+                // Get prediction data
+                const predictionData = window.currentPrediction;
+                if (!predictionData) {
+                    throw new Error('Please make a prediction first before allocating resources.');
+                }
+                
+                // Get regions
+                const regions = document.getElementById('regions').value.split(',').map(r => r.trim()).filter(r => r);
+                if (regions.length === 0) {
+                    throw new Error('Please enter at least one region.');
+                }
+                
+                // Get resources from all resource inputs
+                const resources = [];
+                const resourceInputs = document.querySelectorAll('.resource-input');
+                
+                if (resourceInputs.length === 0) {
+                    throw new Error('Please add at least one resource.');
+                }
+                
+                resourceInputs.forEach(input => {
+                    const typeSelect = input.querySelector('.resource-type');
+                    const amountInput = input.querySelector('.resource-amount');
+                    
+                    if (!typeSelect || !amountInput) {
+                        console.error('Resource input elements not found:', input);
+                        return;
+                    }
+                    
+                    const type = typeSelect.value;
+                    const amount = parseInt(amountInput.value);
+                    
+                    if (!type) {
+                        throw new Error('Please select a resource type for all resources.');
+                    }
+                    
+                    if (isNaN(amount) || amount <= 0) {
+                        throw new Error('Resource amounts must be positive numbers.');
+                    }
+                    
+                    resources.push({
+                        type: type,
+                        amount: amount
+                    });
+                });
+                
+                if (resources.length === 0) {
+                    throw new Error('Please add at least one valid resource.');
+                }
+                
+                console.log('Allocating resources:', { regions, resources });
+                
+                // Make API request
+                const response = await fetch('/api/allocate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prediction: predictionData,
+                        regions: regions,
+                        resources: resources,
+                        disaster_type: predictionData.disaster_type
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to allocate resources. Please try again.');
+                }
+                
+                const data = await response.json();
+                console.log('Allocation response:', data);
+                
+                // Display results
+                displayAllocationResults(data);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error-message').textContent = error.message || 'An unexpected error occurred. Please try again.';
+                document.getElementById('error-container').style.display = 'block';
+            } finally {
+                // Hide loading spinner
+                document.getElementById('loading-spinner').style.display = 'none';
+            }
+        });
+
+        // Reset buttons functionality
+        document.getElementById('prediction-reset').addEventListener('click', function() {
+            document.getElementById('location').value = '';
+            selectedLocationData = null;
+            document.getElementById('prediction-results').style.display = 'none';
+            // Clear markers
+            Object.keys(markers).forEach(key => {
+                markerLayer.removeLayer(markers[key]);
+                delete markers[key];
+            });
+            // Reset map view
+            map.setView([0, 0], 2);
+        });
+
+        document.getElementById('allocation-reset').addEventListener('click', function() {
+            document.getElementById('regions').value = '';
+            
+            // Remove all resource inputs except the first one
+            const resourceInputs = document.querySelectorAll('.resource-input');
+            for (let i = 1; i < resourceInputs.length; i++) {
+                resourceInputs[i].remove();
+            }
+            
+            // Reset the first resource input
+            const firstInput = document.querySelector('.resource-input');
+            if (firstInput) {
+                firstInput.querySelector('.resource-amount').value = '';
+            }
+            
+            document.getElementById('allocation-results').style.display = 'none';
+            
+            // Clear markers
+            Object.keys(markers).forEach(key => {
+                markerLayer.removeLayer(markers[key]);
+                delete markers[key];
+            });
+            
+            // Reset map view
+            map.setView([0, 0], 2);
+        });
+
+        // Trigger a prediction on page load for demonstration
+        window.addEventListener('load', function() {
+            // Wait a moment for the disaster types to load
+            setTimeout(() => {
+                if (document.getElementById('disaster-type').options.length > 0) {
+                    // We're not setting a default location anymore
+                    // Let the user select a location from the autocomplete
+                }
+            }, 1000);
+        });
+
+        // Function to display prediction results
+        function displayPredictionResults(data) {
+            try {
+                console.log('Displaying prediction results:', data);
+                
+                // Check if data is valid
+                if (!data) {
+                    throw new Error('No prediction data received');
+                }
+                
+                // Store the prediction data for later use
+                window.currentPrediction = data;
+                
+                // Update map with prediction location if coordinates are provided
+                if (data.coordinates && typeof addMarker === 'function') {
+                    console.log('Adding marker with coordinates:', data.coordinates);
+                    addMarker(data.location, data.coordinates.lat, data.coordinates.lon, data.impact_level, data.impact_score);
+                    
+                    // Center map on the marker
+                    if (typeof map !== 'undefined') {
+                        map.setView([data.coordinates.lat, data.coordinates.lon], 10);
+                    }
+                } else {
+                    console.log('No coordinates provided or addMarker function not available');
+                    // Try to geocode the location
+                    geocodeLocation(data.location).then(coords => {
+                        if (coords && typeof addMarker === 'function') {
+                            console.log('Geocoded coordinates:', coords);
+                            addMarker(data.location, coords.lat, coords.lon, data.impact_level, data.impact_score);
+                            if (typeof map !== 'undefined') {
+                                map.setView([coords.lat, coords.lon], 10);
+                            }
+                        }
+                    }).catch(err => {
+                        console.error('Error geocoding location:', err);
+                    });
+                }
+                
+                // Format the prediction results as HTML
+                const riskPercent = (data.risk * 100).toFixed(1);
+                const riskLevel = data.impact_level || (riskPercent > 50 ? 'CRITICAL' : riskPercent > 40 ? 'MODERATE' : riskPercent > 20 ? 'MINOR' : 'MINIMAL');
+                const urgencyMetrics = data.urgency_metrics || { max_urgency: 0, avg_urgency: 0 };
+                
+                // Build HTML for specific factors
+                let specificFactorsHtml = '<p><strong>' + (data.disaster_type || '').toLowerCase() + ' Specific Factors</strong></p>';
+                if (data.specific_factors) {
+                    for (const [key, value] of Object.entries(data.specific_factors)) {
+                        specificFactorsHtml += `<p>${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}: ${typeof value === 'boolean' ? (value ? 'Yes' : 'No') : typeof value === 'number' ? value.toFixed(2) : value}</p>`;
+                    }
+                }
+                
+                // Create the HTML content with the progress bar
+                const htmlContent = `
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Impact Assessment</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h3 class="text-${riskLevel === 'CRITICAL' ? 'danger' : riskLevel === 'MODERATE' ? 'warning' : riskLevel === 'MINOR' ? 'info' : 'success'}">${riskLevel}</h3>
+                                    <p>Impact Level: ${riskPercent}%</p>
+                                    <div class="progress">
+                                        <div class="progress-bar ${riskLevel === 'CRITICAL' ? 'bg-danger' : riskLevel === 'MODERATE' ? 'bg-warning' : riskLevel === 'MINOR' ? 'bg-info' : 'bg-success'}" role="progressbar" style="width: ${riskPercent}%" aria-valuenow="${riskPercent}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <p><strong>Location:</strong> ${data.location}</p>
+                                    <p><strong>Disaster Type:</strong> ${data.disaster_type}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Weather Conditions</h6>
+                                    <p>Temperature: ${data.weather?.temp?.toFixed(1) || 'N/A'}°C</p>
+                                    <p>Humidity: ${data.weather?.humidity || 'N/A'}%</p>
+                                    <p>Pressure: ${data.weather?.pressure || 'N/A'} hPa</p>
+                                    <p>Wind Speed: ${data.weather?.wind_speed?.toFixed(1) || 'N/A'} m/s</p>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6>Social Signals</h6>
+                                    <p>Signal Count: ${data.distress_signals || 0}</p>
+                                    <p>Max Urgency: ${urgencyMetrics.max_urgency?.toFixed(2) || 'N/A'}</p>
+                                    <p>Avg Urgency: ${urgencyMetrics.avg_urgency?.toFixed(2) || 'N/A'}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    ${specificFactorsHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Update the prediction results container
+                const resultsDiv = document.getElementById('prediction-results');
+                if (resultsDiv) {
+                    console.log('Updating prediction results div');
+                    resultsDiv.style.display = 'block';
+                    resultsDiv.innerHTML = htmlContent;
+                    
+                    // Scroll to results
+                    resultsDiv.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    console.error('Element with ID "prediction-results" not found');
+                }
+                
+                // Show refresh button
+                const refreshButton = document.getElementById('prediction-refresh');
+                if (refreshButton) {
+                    refreshButton.style.display = 'inline-block';
+                }
+            } catch (error) {
+                console.error('Error displaying prediction results:', error);
+                const errorMessage = document.getElementById('error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = 'Error displaying prediction results: ' + error.message;
+                }
+                const errorContainer = document.getElementById('error-container');
+                if (errorContainer) {
+                    errorContainer.style.display = 'block';
+                }
+            }
+        }
+        
+        // Helper function to get relevant weather features based on disaster type
+        function getRelevantWeatherFeatures(disasterType) {
+            const commonFeatures = ['temperature', 'humidity', 'wind_speed', 'wind_direction'];
+            
+            switch (disasterType.toLowerCase()) {
+                case 'flood':
+                    return [...commonFeatures, 'rainfall_24h', 'rainfall_72h', 'soil_moisture'];
+                case 'tornado':
+                    return [...commonFeatures, 'pressure', 'cloud_cover', 'rainfall_24h'];
+                case 'winter storm':
+                    return [...commonFeatures, 'snowfall_24h', 'pressure', 'visibility'];
+                case 'earthquake':
+                    return ['temperature', 'humidity', 'pressure'];
+                case 'landslide':
+                    return [...commonFeatures, 'rainfall_24h', 'rainfall_72h', 'soil_moisture'];
+                case 'drought':
+                    return [...commonFeatures, 'rainfall_24h', 'rainfall_72h', 'soil_moisture', 'drought_index'];
+                case 'volcanic eruption':
+                    return [...commonFeatures, 'pressure', 'visibility', 'air_quality'];
+                case 'wildfire':
+                    return [...commonFeatures, 'rainfall_24h', 'soil_moisture', 'air_quality'];
+                case 'tsunami':
+                    return ['temperature', 'pressure', 'wind_speed', 'wind_direction'];
+                case 'hurricane':
+                case 'hurricane/typhoon/cyclone':
+                    return [...commonFeatures, 'pressure', 'rainfall_24h', 'visibility', 'wave_height'];
+                default:
+                    return commonFeatures;
+            }
+        }
+        
+        // Helper function to get disaster-specific features
+        function getDisasterSpecificFeatures(disasterType) {
+            switch (disasterType.toLowerCase()) {
+                case 'flood':
+                    return ['flood_depth', 'river_level', 'distance_to_water', 'elevation'];
+                case 'tornado':
+                    return ['tornado_category', 'tornado_width', 'tornado_path_length'];
+                case 'winter storm':
+                    return ['snow_depth', 'ice_accumulation', 'road_conditions'];
+                case 'earthquake':
+                    return ['magnitude', 'depth', 'distance_to_epicenter', 'aftershock_probability'];
+                case 'landslide':
+                    return ['slope_angle', 'soil_type', 'vegetation_cover', 'landslide_probability'];
+                case 'drought':
+                    return ['drought_index', 'vegetation_health', 'water_level', 'soil_moisture'];
+                case 'volcanic eruption':
+                    return ['distance_to_volcano', 'ash_column_height', 'lava_flow_speed', 'eruption_intensity'];
+                case 'wildfire':
+                    return ['fire_intensity', 'fire_spread_rate', 'vegetation_type', 'distance_to_fire'];
+                case 'tsunami':
+                    return ['wave_height', 'distance_to_coast', 'elevation', 'arrival_time'];
+                case 'hurricane':
+                case 'hurricane/typhoon/cyclone':
+                    return ['hurricane_category', 'storm_surge_height', 'distance_to_eye', 'forward_speed'];
+                default:
+                    return [];
+            }
+        }
+
+        // Refresh prediction
+        document.getElementById('prediction-refresh').addEventListener('click', function() {
+            // Only refresh if we have a location and disaster type
+            const location = document.getElementById('location').value;
+            const disasterType = document.getElementById('disaster-type').value;
+            
+            if (location && disasterType) {
+                // Submit the form to refresh the prediction
+                document.getElementById('prediction-form').dispatchEvent(new Event('submit'));
+            }
+        });
+        
+        // Show refresh button after successful prediction
+        function showRefreshButton() {
+            document.getElementById('prediction-refresh').style.display = 'inline-block';
+        }
+        
+        // Update displayPredictionResults to show refresh button
+        const originalDisplayPredictionResults = displayPredictionResults;
+        displayPredictionResults = function(data) {
+            originalDisplayPredictionResults(data);
+            showRefreshButton();
+        };
+
+        // Update the disaster type dropdown options
+        function populateDisasterTypes() {
+            const disasterTypeSelect = document.getElementById('disaster-type');
+            const disasterTypes = [
+                'flood',
+                'tornado',
+                'winter storm',
+                'earthquake',
+                'landslide',
+                'drought',
+                'volcanic eruption',
+                'wildfire',
+                'tsunami',
+                'hurricane/typhoon/cyclone'
+            ];
+            
+            // Clear existing options
+            disasterTypeSelect.innerHTML = '';
+            
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select disaster type';
+            defaultOption.selected = true;
+            defaultOption.disabled = true;
+            disasterTypeSelect.appendChild(defaultOption);
+            
+            // Add disaster type options
+            disasterTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                disasterTypeSelect.appendChild(option);
+            });
+        }
+
+        // Call the function when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            populateDisasterTypes();
+            // ... other initialization code ...
+        });
+
+        // Helper function to format feature values
+        function formatFeatureValue(key, value) {
+            // Format based on key name
+            if (key.includes('temperature')) {
+                return `${value}°C`;
+            } else if (key.includes('rainfall') || key.includes('snowfall')) {
+                return `${value} mm`;
+            } else if (key.includes('wind_speed')) {
+                return `${value} km/h`;
+            } else if (key.includes('humidity') || key.includes('probability')) {
+                return `${(value * 100).toFixed(1)}%`;
+            } else if (key.includes('distance') && !key.includes('social')) {
+                return `${value} km`;
+            } else if (key.includes('elevation')) {
+                return `${value} m`;
+            } else if (key.includes('ash_column_height')) {
+                return `${value} m`;
+            } else if (key.includes('lava_flow_speed')) {
+                return `${value} m/h`;
+            } else if (key.includes('wave_height')) {
+                return `${value} m`;
+            } else if (key.includes('fire_spread_rate')) {
+                return `${value} m/min`;
+            } else if (key.includes('drought_index')) {
+                // Format drought index on a scale of 0-10
+                return `${value.toFixed(1)}/10`;
+            } else if (typeof value === 'number') {
+                return value.toFixed(2);
+            }
+            return value;
+        }
+
+        // Helper function to format feature names
+        function formatFeatureName(name) {
+            return name
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // Function to display allocation results
+        function displayAllocationResults(data) {
+            try {
+                console.log('Displaying allocation results:', data);
+                
+                // Check if data is valid
+                if (!data) {
+                    throw new Error('No allocation data received');
+                }
+                
+                // Get the allocation results container
+                const resultsDiv = document.getElementById('allocation-results');
+                if (!resultsDiv) {
+                    console.error('Element with ID "allocation-results" not found');
+                    return;
+                }
+                
+                // Show the results container
+                resultsDiv.style.display = 'block';
+                
+                // Get the content container
+                const contentDiv = document.getElementById('allocation-results-content');
+                if (!contentDiv) {
+                    console.error('Element with ID "allocation-results-content" not found');
+                    return;
+                }
+                
+                // Create a table to display the allocation results
+                let html = '<div class="table-responsive"><table class="table table-striped">';
+                
+                // Add table header
+                html += '<thead><tr><th>Region</th><th>Impact Level</th>';
+                
+                // Add a column for each resource type
+                const resourceTypes = new Set();
+                if (data.allocations) {
+                    Object.values(data.allocations).forEach(allocation => {
+                        Object.keys(allocation).forEach(type => resourceTypes.add(type));
+                    });
+                }
+                
+                Array.from(resourceTypes).forEach(type => {
+                    html += `<th>${formatResourceType(type)}</th>`;
+                });
+                
+                html += '</tr></thead><tbody>';
+                
+                // Add a row for each region
+                const regions = Object.keys(data.allocations || {});
+                
+                regions.forEach(region => {
+                    const allocation = data.allocations[region];
+                    const prediction = data.predictions?.[region];
+                    
+                    // Determine impact level and color
+                    let impactLevel = 'Unknown';
+                    let impactColor = 'secondary';
+                    
+                    if (prediction) {
+                        const impactScore = prediction.impact_score || 0;
+                        
+                        if (impactScore > 0.8) {
+                            impactLevel = 'Catastrophic';
+                            impactColor = 'danger';
+                        } else if (impactScore > 0.6) {
+                            impactLevel = 'Severe';
+                            impactColor = 'danger';
+                        } else if (impactScore > 0.4) {
+                            impactLevel = 'Moderate';
+                            impactColor = 'warning';
+                        } else if (impactScore > 0.2) {
+                            impactLevel = 'Minor';
+                            impactColor = 'info';
+                        } else {
+                            impactLevel = 'Minimal';
+                            impactColor = 'success';
+                        }
+                    }
+                    
+                    // Add the row
+                    html += `<tr>
+                        <td>${region}</td>
+                        <td><span class="badge bg-${impactColor}">${impactLevel}</span></td>`;
+                    
+                    // Add a cell for each resource type
+                    Array.from(resourceTypes).forEach(type => {
+                        const amount = allocation?.[type] || 0;
+                        html += `<td>${amount}</td>`;
+                    });
+                    
+                    html += '</tr>';
+                });
+                
+                // Add a totals row
+                html += '<tr class="table-active"><td><strong>Total</strong></td><td></td>';
+                
+                Array.from(resourceTypes).forEach(type => {
+                    let total = 0;
+                    regions.forEach(region => {
+                        const allocation = data.allocations[region];
+                        total += allocation?.[type] || 0;
+                    });
+                    html += `<td><strong>${total}</strong></td>`;
+                });
+                
+                html += '</tr></tbody></table></div>';
+                
+                // Add explanation if available
+                if (data.explanation) {
+                    html += `<div class="alert alert-info mt-3">
+                        <h6>Allocation Strategy:</h6>
+                        <p>${data.explanation}</p>
+                    </div>`;
+                }
+                
+                // Update the content
+                contentDiv.innerHTML = html;
+                
+                // Scroll to results
+                resultsDiv.scrollIntoView({ behavior: 'smooth' });
+                
+                // Update map with allocation markers
+                updateMapWithAllocations(data);
+            } catch (error) {
+                console.error('Error displaying allocation results:', error);
+                document.getElementById('error-message').textContent = 'Error displaying allocation results: ' + error.message;
+                document.getElementById('error-container').style.display = 'block';
+            }
+        }
+        
+        // Helper function to format resource type names
+        function formatResourceType(type) {
+            return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        
+        // Function to update map with allocation markers
+        function updateMapWithAllocations(data) {
+            // Clear existing markers
+            markerLayer.clearLayers();
+            
+            // Add markers for each region
+            const regions = Object.keys(data.allocations || {});
+            let firstValidCoords = null;
+            
+            regions.forEach(region => {
+                geocodeLocation(region).then(coords => {
+                    if (coords) {
+                        if (!firstValidCoords) {
+                            firstValidCoords = coords;
+                        }
+                        
+                        const prediction = data.predictions?.[region];
+                        const impactLevel = prediction?.impact_level || 'minimal';
+                        const impactScore = prediction?.impact_score || 0.1;
+                        
+                        addMarker(region, coords.lat, coords.lon, impactLevel, impactScore);
+                    }
+                }).catch(err => {
+                    console.error('Error geocoding region for map:', err);
+                });
+            });
+            
+            // Center map on the first valid region after a short delay
+            setTimeout(() => {
+                if (firstValidCoords) {
+                    map.setView([firstValidCoords.lat, firstValidCoords.lon], 6);
+                }
+            }, 500);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[Unit]
+Description=DisasterLens Web Application
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/DisasterLens
+Environment="PATH=/path/to/DisasterLens/venv/bin"
+ExecStart=/path/to/DisasterLens/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:5001 --timeout 120 "src.api.app:app"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target 
