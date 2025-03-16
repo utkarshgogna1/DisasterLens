@@ -16,7 +16,8 @@ class DisasterLensTest(unittest.TestCase):
         cls.process = subprocess.Popen(
             ["python", "-m", "src.api.app"],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env={**os.environ, "FLASK_RUN_PORT": "5001"}
         )
         # Give the server time to start
         time.sleep(3)
@@ -30,7 +31,7 @@ class DisasterLensTest(unittest.TestCase):
         
     def test_home_page(self):
         """Test that the home page loads correctly."""
-        response = requests.get("http://localhost:5000")
+        response = requests.get("http://localhost:5001")
         self.assertEqual(response.status_code, 200)
         self.assertIn("DisasterLens", response.text)
         
@@ -41,7 +42,7 @@ class DisasterLensTest(unittest.TestCase):
             "coordinates": "35.3606,138.7274",
             "disaster_type": "Landslide"
         }
-        response = requests.post("http://localhost:5000/api/predict", json=data)
+        response = requests.post("http://localhost:5001/api/predict", json=data)
         self.assertEqual(response.status_code, 200)
         self.assertIn("impact_level", response.json())
         

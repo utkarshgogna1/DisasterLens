@@ -9,7 +9,8 @@ import os
 from typing import Dict, Any, List
 import copy
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for
+from flask_cors import CORS
 
 from src.models.predictor import predict_disaster_impact
 from src.optimization.allocator import allocate_resources
@@ -22,6 +23,7 @@ app = Flask(
     template_folder=os.path.join(os.path.dirname(__file__), "templates"),
     static_folder=os.path.join(os.path.dirname(__file__), "static"),
 )
+CORS(app)  # Enable CORS for all routes
 
 # Load configuration
 config = get_config()
@@ -132,6 +134,12 @@ def sanitize_prediction_result(result):
         sanitized['coordinates'] = coordinates
     
     return sanitized
+
+
+@app.route("/health")
+def health():
+    """Health check endpoint for monitoring."""
+    return jsonify({"status": "healthy"}), 200
 
 
 @app.route("/")

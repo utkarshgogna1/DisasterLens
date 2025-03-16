@@ -145,6 +145,53 @@ This guide provides instructions for deploying the DisasterLens application in v
 
 5. Access the application at the provided URL
 
+## Deploying to Render
+
+Render is a cloud platform that makes it easy to deploy web applications. Follow these steps to deploy DisasterLens to Render:
+
+### Prerequisites
+
+- A Render account (sign up at https://render.com/)
+- Your DisasterLens code in a GitHub repository
+
+### Deployment Steps
+
+1. **Connect your GitHub repository to Render**:
+   - Log in to your Render account
+   - Go to the Dashboard and click "New +"
+   - Select "Web Service"
+   - Connect your GitHub repository
+
+2. **Configure the Web Service**:
+   - Name: disasterlens-api (or your preferred name)
+   - Environment: Python
+   - Build Command: `pip install -r requirements-render.txt`
+   - Start Command: `gunicorn src.api.app:app --bind 0.0.0.0:$PORT`
+   - Health Check Path: `/health`
+   - Python Version: 3.10.0
+   - Environment Variables:
+     - FLASK_ENV: production
+
+3. **Deploy the Service**:
+   - Click "Create Web Service"
+   - Render will automatically build and deploy your application
+
+4. **Access Your Deployed Application**:
+   - Once deployment is complete, your application will be available at the URL provided by Render
+   - Typically: https://disasterlens-api.onrender.com
+
+### Using render.yaml for Automated Deployment
+
+You can also use the provided `render.yaml` file for automated deployment:
+
+1. Push the `render.yaml` file to your GitHub repository
+2. In Render, go to the Dashboard and click "New +"
+3. Select "Blueprint"
+4. Connect your GitHub repository
+5. Render will automatically detect the `render.yaml` file and configure the services accordingly
+
+For more detailed instructions, see [RENDER.md](RENDER.md).
+
 ## Troubleshooting
 
 - **Port already in use**: Kill the process using the port:

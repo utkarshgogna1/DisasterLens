@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: disasterlens-api
+    env: python
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: gunicorn src.api.app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_RUN_PORT
+        value: $PORT
+    healthCheckPath: /health
+    autoDeploy: true 

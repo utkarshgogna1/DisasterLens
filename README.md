@@ -65,7 +65,7 @@ cp .env.example .env
 python -m src.api.app
 ```
 
-The application will be available at http://localhost:5000
+The application will be available at http://localhost:5001
 
 ### Production Mode
 
@@ -74,7 +74,7 @@ The application will be available at http://localhost:5000
 ./deploy.sh
 
 # Or manually with Gunicorn
-gunicorn --bind 0.0.0.0:5000 --workers 4 src.api.app:app
+gunicorn --bind 0.0.0.0:5001 --workers 4 src.api.app:app
 ```
 
 ### Docker Deployment
@@ -83,6 +83,17 @@ gunicorn --bind 0.0.0.0:5000 --workers 4 src.api.app:app
 # Build and run with Docker Compose
 docker-compose up -d
 ```
+
+### Render Deployment
+
+DisasterLens can be deployed to Render, a cloud platform for hosting web applications:
+
+```bash
+# Deploy to Render using the provided configuration
+# See RENDER.md for detailed instructions
+```
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md) and [RENDER.md](RENDER.md).
 
 ## Testing
 
@@ -130,4 +141,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Weather data provided by OpenWeatherMap API
 - Social vulnerability data based on CDC's Social Vulnerability Index
-- Map visualization powered by Leaflet and Folium 
+- Map visualization powered by Leaflet and Folium

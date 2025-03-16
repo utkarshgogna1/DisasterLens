@@ -4,10 +4,11 @@ services:
   web:
     build: .
     ports:
-      - "5000:5000"
+      - "5001:5001"
     volumes:
       - ./logs:/app/logs
     environment:
       - FLASK_APP=src.api.app
       - FLASK_ENV=production
+      - FLASK_RUN_PORT=5001
     restart: unless-stopped 

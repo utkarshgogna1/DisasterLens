@@ -30,6 +30,6 @@ pkill -f "gunicorn.*src.api.app:app" || true
 
 # Start the application with Gunicorn
 echo "Starting DisasterLens with Gunicorn..."
-gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 --log-file logs/gunicorn.log --log-level info --daemon src.api.app:app
+gunicorn --bind 0.0.0.0:5001 --workers 4 --timeout 120 --log-file logs/gunicorn.log --log-level info --daemon src.api.app:app
 
-echo "DisasterLens deployed successfully! Running on http://localhost:5000" 
+echo "DisasterLens deployed successfully! Running on http://localhost:5001" 
