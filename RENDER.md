@@ -16,6 +16,23 @@ This document provides instructions for deploying the DisasterLens application t
    - Python Version: 3.10.0
    - Environment Variables:
      - FLASK_ENV: production
+     - PYTHONPATH: .
+
+## Alternative Deployment Using wsgi.py
+
+If you encounter module import issues, you can use the wsgi.py file:
+
+1. Create a new Web Service
+2. Use the following settings:
+   - Name: disasterlens-api
+   - Environment: Python
+   - Build Command: `pip install -r requirements-render.txt`
+   - Start Command: `gunicorn wsgi:app --bind 0.0.0.0:$PORT`
+   - Health Check Path: `/health`
+   - Python Version: 3.10.0
+   - Environment Variables:
+     - FLASK_ENV: production
+     - PYTHONPATH: .
 
 ## Accessing the Deployed Application
 
@@ -27,9 +44,10 @@ https://disasterlens-api.onrender.com
 If you encounter any issues during deployment, check the Render logs for error messages.
 
 Common issues:
-- Missing dependencies: Make sure all required packages are listed in requirements-render.txt
-- Environment variables: Ensure all necessary environment variables are set in the Render dashboard
-- Port configuration: Render automatically sets the PORT environment variable, make sure your application uses it
+- **Module not found errors**: Make sure the PYTHONPATH environment variable is set to `.` to include the root directory in the Python path.
+- **Missing dependencies**: Make sure all required packages are listed in requirements-render.txt
+- **Environment variables**: Ensure all necessary environment variables are set in the Render dashboard
+- **Port configuration**: Render automatically sets the PORT environment variable, make sure your application uses it
 
 ## Local Testing
 
