@@ -31,6 +31,14 @@ if kill -0 $DIRECT_PID 2>/dev/null; then
     HEALTH_RESPONSE=$(curl -s http://localhost:5001/health)
     if [[ "$HEALTH_RESPONSE" == *"healthy"* ]]; then
         echo "✅ Health endpoint works!"
+        
+        echo "Testing disaster types endpoint..."
+        DISASTER_TYPES_RESPONSE=$(curl -s http://localhost:5001/api/disaster_types)
+        if [[ "$DISASTER_TYPES_RESPONSE" == *"flood"* ]]; then
+            echo "✅ Disaster types endpoint works!"
+        else
+            echo "❌ Disaster types endpoint failed: $DISASTER_TYPES_RESPONSE"
+        fi
     else
         echo "❌ Health endpoint failed: $HEALTH_RESPONSE"
     fi
@@ -57,6 +65,14 @@ if kill -0 $WSGI_PID 2>/dev/null; then
     HEALTH_RESPONSE=$(curl -s http://localhost:5001/health)
     if [[ "$HEALTH_RESPONSE" == *"healthy"* ]]; then
         echo "✅ Health endpoint works!"
+        
+        echo "Testing disaster types endpoint..."
+        DISASTER_TYPES_RESPONSE=$(curl -s http://localhost:5001/api/disaster_types)
+        if [[ "$DISASTER_TYPES_RESPONSE" == *"flood"* ]]; then
+            echo "✅ Disaster types endpoint works!"
+        else
+            echo "❌ Disaster types endpoint failed: $DISASTER_TYPES_RESPONSE"
+        fi
     else
         echo "❌ Health endpoint failed: $HEALTH_RESPONSE"
     fi

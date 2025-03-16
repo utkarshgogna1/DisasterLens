@@ -486,6 +486,19 @@
             .then(response => response.json())
             .then(data => {
                 const select = document.getElementById('disaster-type');
+                
+                // Clear existing options
+                select.innerHTML = '';
+                
+                // Add default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select disaster type';
+                defaultOption.selected = true;
+                defaultOption.disabled = true;
+                select.appendChild(defaultOption);
+                
+                // Add disaster type options
                 data.forEach(type => {
                     const option = document.createElement('option');
                     option.value = type.id;
@@ -1111,45 +1124,8 @@
             showRefreshButton();
         };
 
-        // Update the disaster type dropdown options
-        function populateDisasterTypes() {
-            const disasterTypeSelect = document.getElementById('disaster-type');
-            const disasterTypes = [
-                'flood',
-                'tornado',
-                'winter storm',
-                'earthquake',
-                'landslide',
-                'drought',
-                'volcanic eruption',
-                'wildfire',
-                'tsunami',
-                'hurricane/typhoon/cyclone'
-            ];
-            
-            // Clear existing options
-            disasterTypeSelect.innerHTML = '';
-            
-            // Add default option
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = 'Select disaster type';
-            defaultOption.selected = true;
-            defaultOption.disabled = true;
-            disasterTypeSelect.appendChild(defaultOption);
-            
-            // Add disaster type options
-            disasterTypes.forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-                disasterTypeSelect.appendChild(option);
-            });
-        }
-
         // Call the function when the page loads
         document.addEventListener('DOMContentLoaded', function() {
-            populateDisasterTypes();
             // ... other initialization code ...
         });
 
