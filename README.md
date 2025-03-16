@@ -22,7 +22,7 @@ DisasterLens is a comprehensive disaster impact prediction and resource allocati
 # DisasterLens
 Predict the impact of natural disasters and optimize resource allocation.
 
-**Live Demo:** ([https://disasterlens-api.onrender.com](https://disasterlens.onrender.com/))
+**Live Demo:** ([https://disasterlens.onrender.com](https://disasterlens.onrender.com/))
 
 ## Installation
 
