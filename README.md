@@ -19,6 +19,11 @@ DisasterLens is a comprehensive disaster impact prediction and resource allocati
 - **Visualization**: Plotly, Folium
 - **Deployment**: Docker, Gunicorn
 
+# DisasterLens
+Predict the impact of natural disasters and optimize resource allocation.
+
+**Live Demo:** [https://disasterlens-api.onrender.com](https://disasterlens-api.onrender.com)
+
 ## Installation
 
 ### Quick Setup
@@ -94,6 +99,13 @@ DisasterLens can be deployed to Render, a cloud platform for hosting web applica
 ```
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md) and [RENDER.md](RENDER.md).
+
+
+## Usage
+1. Visit the live demo URL.
+2. Enter a location (e.g., "Boston, Suffolk County, Massachusetts, United States").
+3. Select a disaster type (e.g., "Winter Storm").
+4. Click "Predict Impact" to see the predicted impact, weather conditions, and social signals.
 
 ## Testing
 
